@@ -1,7 +1,11 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import morgan from 'morgan';
+
+
+// Routes 
 import authRoutes from './routes/auth.routes.js';
+import chatRoutes from './routes/chat.routes.js';
 
 
 
@@ -14,9 +18,10 @@ app.use(cookieParser());
 
 
 
-// Routes 
+// Using Routes
 
 app.use('/api/auth',authRoutes);
+app.use('/api/chat',chatRoutes);
 
 
 
