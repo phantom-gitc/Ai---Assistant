@@ -7,7 +7,7 @@ const ai = new GoogleGenAI({
 
 async function generateAIResponse(chatHistory) {
   if (!config.GEMINI_API_KEY) {
-    return "Gemini API key is missing. Add GEMINI_API_KEY to backend/.env and restart the server.";
+    throw new Error("Gemini API key is missing. Add GEMINI_API_KEY to backend/.env and restart the server.");
   }
 
   try {
@@ -33,7 +33,7 @@ async function generateAIResponse(chatHistory) {
       message: error?.message,
     });
 
-    return (
+    throw new Error(
       error?.message ||
       "Something went wrong while generating AI response."
     );

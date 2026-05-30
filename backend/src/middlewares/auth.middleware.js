@@ -5,7 +5,7 @@ import config from '../config/config.js';
 
 async function authUser(req , res , next) {
     
-    const {token} = req.cookies;
+    const {token} = req.cookies || {};
 
     if(!token){
        return res.status(401).json({
@@ -17,6 +17,12 @@ async function authUser(req , res , next) {
         const decoded = jwt.verify(token,config.JWT_SECRET);
 
         const user = await User.findById(decoded.id);
+
+        if(!user){
+            return res.status(401).json({
+                message:'Unauthorized',
+            })
+        }
 
         req.user = user;
         next();

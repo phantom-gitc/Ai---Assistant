@@ -3,34 +3,29 @@ import cookie from "cookie";
 import jwt from "jsonwebtoken";
 import config from "../config/config.js";
 import aiService from "../services/ai.service.js";
+import Chat from "../models/chat.model.js";
 import Message from "../models/message.model.js";
 
-
-// Initialize Socket.IO server 
-
-
+// Initialize Socket.IO server
 async function initSocketServer(httpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: "http://localhost:5173",
+      origin: config.CLIENT_URL,
       credentials: true,
     },
   });
 
-  // Authenticate socket connection 
+  // Authenticate socket connection
   io.use((socket, next) => {
     try {
       const cookies = cookie.parse(socket.handshake.headers.cookie || "");
-
       const token = cookies.token;
 
       if (!token) {
         return next(new Error("Unauthorized: No token provided"));
       }
-      // Verify JWT token
 
       const decoded = jwt.verify(token, config.JWT_SECRET);
-
       socket.user = decoded;
 
       next();
@@ -40,61 +35,59 @@ async function initSocketServer(httpServer) {
   });
 
   io.on("connection", (socket) => {
-    console.log("✅ User connected:", socket.user, socket.id);
-
-    // Handle user message event
-
+    console.log("User connected:", socket.user.id, socket.id);
 
     socket.on("ai-message", async (messagePayload) => {
       try {
-        console.log("📩 Incoming message:", messagePayload);
+        const content = messagePayload?.content?.trim();
+        const chatId = messagePayload?.chat;
 
-        // Validate
-        if (!messagePayload?.content) {
+        if (!content) {
           return socket.emit("ai-error", "Content is required");
         }
 
-        // Save message to database
-        await Message.create({
-          user: socket.user._id,
-          chat: messagePayload.chat,
-          content: messagePayload.content,
-          role: messagePayload.role,
+        if (!chatId) {
+          return socket.emit("ai-error", "Chat is required");
+        }
+
+        const chat = await Chat.findOne({
+          _id: chatId,
+          user: socket.user.id,
         });
 
-        // Get chat history for the current chat (limit 5 messages) 
+        if (!chat) {
+          return socket.emit("ai-error", "Chat not found");
+        }
+
+        await Message.create({
+          user: socket.user.id,
+          chat: chatId,
+          content,
+          role: "user",
+        });
+
+        chat.lastActivity = new Date();
+        await chat.save();
 
         const recentMessages = await Message.find({
-          chat: messagePayload.chat,})
+          chat: chatId,
+        })
           .sort({ createdAt: -1 })
           .limit(15);
 
-        
         const chatHistory = recentMessages.reverse();
- 
         const response = await aiService(chatHistory);
 
-        console.log("🤖 AI response:", response);
-
-
-        // Save response to database
-        // @param {string} response - The AI response.
-        // @throws {Error} - If the database operation fails.
-
         await Message.create({
-          user: socket.user._id,
-          chat: messagePayload.chat,
+          user: socket.user.id,
+          chat: chatId,
           content: response,
           role: "model",
         });
 
-
-        // Send response back to client
-        // @param {string} response - The AI response.
-
         socket.emit("ai-response", {
           response,
-          chat: messagePayload.chat,
+          chat: chatId,
         });
       } catch (error) {
         console.error("AI service error:", error);
@@ -105,11 +98,8 @@ async function initSocketServer(httpServer) {
       }
     });
 
-    // Handle socket disconnection
-    // @param {string} socket.id - The ID of the socket that disconnected.
-
     socket.on("disconnect", () => {
-      console.log("❌ User disconnected:", socket.id);
+      console.log("User disconnected:", socket.id);
     });
   });
 
