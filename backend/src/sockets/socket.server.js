@@ -40,20 +40,38 @@ async function initSocketServer(httpServer) {
     socket.on("ai-message", async (messagePayload) => {
       try {
         const content = messagePayload?.content?.trim();
-        const chatId = messagePayload?.chat;
+        const title = messagePayload?.title?.trim();
+        const useSearch = messagePayload?.useSearch || false;
+        let chatId = messagePayload?.chat;
 
         if (!content) {
           return socket.emit("ai-error", "Content is required");
         }
 
-        if (!chatId) {
-          return socket.emit("ai-error", "Chat is required");
-        }
+        let chat;
 
-        const chat = await Chat.findOne({
-          _id: chatId,
-          user: socket.user.id,
-        });
+        if (chatId) {
+          chat = await Chat.findOne({
+            _id: chatId,
+            user: socket.user.id,
+          });
+        } else if (title) {
+          chat = await Chat.findOne({
+            title,
+            user: socket.user.id,
+          });
+
+          if (!chat) {
+            chat = await Chat.create({
+              title,
+              user: socket.user.id,
+            });
+          }
+
+          chatId = chat._id;
+        } else {
+          return socket.emit("ai-error", "Chat or title is required");
+        }
 
         if (!chat) {
           return socket.emit("ai-error", "Chat not found");
@@ -76,24 +94,27 @@ async function initSocketServer(httpServer) {
           .limit(15);
 
         const chatHistory = recentMessages.reverse();
-        const response = await aiService(chatHistory);
+        const aiResponse = await aiService(chatHistory, { useSearch });
 
         await Message.create({
           user: socket.user.id,
           chat: chatId,
-          content: response,
+          content: aiResponse.text,
           role: "model",
+          groundingMetadata: aiResponse.groundingMetadata,
         });
 
         socket.emit("ai-response", {
-          response,
+          response: aiResponse.text,
+          groundingMetadata: aiResponse.groundingMetadata,
           chat: chatId,
+          title: chat.title,
         });
       } catch (error) {
         console.error("AI service error:", error);
 
         socket.emit("ai-error", {
-          message: "Something went wrong while generating response",
+          message: error?.message || "Something went wrong while generating response",
         });
       }
     });

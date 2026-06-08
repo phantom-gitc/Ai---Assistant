@@ -5,12 +5,18 @@ const ai = new GoogleGenAI({
   apiKey: config.GEMINI_API_KEY,
 });
 
-async function generateAIResponse(chatHistory) {
+async function generateAIResponse(chatHistory, options = {}) {
   if (!config.GEMINI_API_KEY) {
     throw new Error("Gemini API key is missing. Add GEMINI_API_KEY to backend/.env and restart the server.");
   }
 
   try {
+    const apiConfig = {};
+
+    if (options.useSearch) {
+      apiConfig.tools = [{ googleSearch: {} }];
+    }
+
     const response = await ai.models.generateContent({
       model: config.GEMINI_MODEL,
 
@@ -23,9 +29,15 @@ async function generateAIResponse(chatHistory) {
           },
         ],
       })),
+      config: apiConfig,
     });
 
-    return response.text;
+    const groundingMetadata = response.candidates?.[0]?.groundingMetadata || null;
+
+    return {
+      text: response.text,
+      groundingMetadata,
+    };
   } catch (error) {
     console.error("Gemini API error:", {
       status: error?.status,

@@ -22,6 +22,10 @@ const messageSchema = new mongoose.Schema({
         type:String,
         enum:["user","model" ,"system"],
         default:"user",
+    },
+    groundingMetadata:{
+        type:Object,
+        default:null,
     }
 },{
     timestamps:true,
