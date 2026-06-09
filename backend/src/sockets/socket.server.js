@@ -42,6 +42,9 @@ async function initSocketServer(httpServer) {
         const content = messagePayload?.content?.trim();
         const title = messagePayload?.title?.trim();
         const useSearch = messagePayload?.useSearch || false;
+        const useCodeExecution = messagePayload?.useCodeExecution || false;
+        // attachment: { mimeType, data (base64), fileName } — sent from frontend
+        const attachment = messagePayload?.attachment || null;
         let chatId = messagePayload?.chat;
 
         if (!content) {
@@ -77,15 +80,30 @@ async function initSocketServer(httpServer) {
           return socket.emit("ai-error", "Chat not found");
         }
 
+        // Build attachment metadata for storage (we never store raw base64 in DB)
+        const attachmentMeta = attachment
+          ? [{
+              fileName: attachment.fileName || "attachment",
+              mimeType: attachment.mimeType,
+              fileType: attachment.mimeType?.startsWith("image/") ? "image"
+                : attachment.mimeType === "application/pdf" ? "pdf"
+                : attachment.mimeType?.includes("wordprocessingml") ? "docx"
+                : "text",
+            }]
+          : [];
+
         await Message.create({
           user: socket.user.id,
           chat: chatId,
           content,
           role: "user",
+          attachments: attachmentMeta,
         });
 
-        chat.lastActivity = new Date();
-        await chat.save();
+        await Chat.updateOne(
+          { _id: chatId },
+          { $set: { lastActivity: new Date() } }
+        );
 
         const recentMessages = await Message.find({
           chat: chatId,
@@ -94,7 +112,7 @@ async function initSocketServer(httpServer) {
           .limit(15);
 
         const chatHistory = recentMessages.reverse();
-        const aiResponse = await aiService(chatHistory, { useSearch });
+        const aiResponse = await aiService(chatHistory, { useSearch, useCodeExecution, attachment });
 
         await Message.create({
           user: socket.user.id,

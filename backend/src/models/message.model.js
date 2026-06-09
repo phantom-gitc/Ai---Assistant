@@ -26,10 +26,20 @@ const messageSchema = new mongoose.Schema({
     groundingMetadata:{
         type:Object,
         default:null,
+    },
+    attachments: {
+        type: [{
+            fileType: { type: String, enum: ["image", "pdf", "docx", "text"] },
+            mimeType: { type: String },
+            fileName: { type: String },
+        }],
+        default: [],
     }
 },{
     timestamps:true,
 })
 
+
+messageSchema.index({ chat: 1, createdAt: -1 });
 
 export default mongoose.model("Message",messageSchema);

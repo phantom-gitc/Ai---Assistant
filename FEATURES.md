@@ -24,7 +24,7 @@ This document maps out how you can upgrade your MERN AI assistant to perform key
 
 ---
 
-## 2. Sandboxed Code Execution (Advanced Data Analysis)
+## 2. Sandboxed Code Execution (Advanced Data Analysis) - [COMPLETED (BACKEND)]
 * **Goal:** Let the assistant write and execute Python code dynamically to solve complex math, analyze data, or generate outputs.
 * **Cost:** $0 (Free built-in tool in the Gemini API).
 * **How it works:** 
@@ -43,7 +43,7 @@ This document maps out how you can upgrade your MERN AI assistant to perform key
 
 ---
 
-## 3. Multimodal Support (Image & Document Upload)
+## 3. Multimodal Support (Image & Document Upload) - [COMPLETED (BACKEND)]
 * **Goal:** Enable users to upload images, PDFs, CSVs, or text files for the assistant to analyze.
 * **Cost:** $0.
 * **How it works:**
