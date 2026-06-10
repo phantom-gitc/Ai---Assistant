@@ -109,25 +109,7 @@ To retrieve the code and its execution results, we must iterate through the raw 
     groundingMetadata,
   };
   ```
-* **Optimized Code:**
-  ```javascript
-  // Loop through all generated parts and format them cleanly
-  function formatResponseParts(parts) {
-    if (!parts || !Array.isArray(parts)) return "";
-    let textResponse = "";
-    for (const part of parts) {
-      if (part.text) {
-        textResponse += part.text;
-      } else if (part.executableCode) {
-        const lang = part.executableCode.language ? part.executableCode.language.toLowerCase() : "python";
-        textResponse += `\n\n\`\`\`${lang}\n${part.executableCode.code.trim()}\n\`\`\`\n\n`;
-      } else if (part.codeExecutionResult) {
-        textResponse += `\n\n\`\`\`\nOutput:\n${part.codeExecutionResult.output.trim()}\n\`\`\`\n\n`;
-      }
-    }
-    return textResponse.replace(/\n{3,}/g, "\n\n").trim();
-  }
-  ```
+
 
 #### 💡 Why it's helpful:
 This ensures the client receives fully-rendered markdown containing the Python script and stdout outputs cleanly formatted in ```python and output blocks, ensuring seamless visualization without frontend logic modifications.
@@ -141,3 +123,4 @@ This ensures the client receives fully-rendered markdown containing the Python s
 
 ### Q2: *"Why did you switch from chat.save() to Chat.updateOne()?"*
 * **Answer:** *"Mongoose `.save()` is full-lifecycle. It retrieves the document state, checks modified paths, runs validation, and fires hooks before writing the full document back. In high-concurrency environments, if the same document is loaded and edited concurrently, Mongoose throws a `ParallelSaveError` to prevent overwriting changes. Switching to `Chat.updateOne()` with an atomic `$set` command writes directly to MongoDB. It is completely stateless, immune to parallel save conflicts, and runs much faster."*
+
