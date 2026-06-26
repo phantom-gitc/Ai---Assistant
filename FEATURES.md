@@ -66,7 +66,7 @@ This document maps out how you can upgrade your MERN AI assistant to perform key
 
 ---
 
-## 4. Claude-style Interactive "Artifacts"
+## 4. Claude-style Interactive "Artifacts" - [COMPLETED (BACKEND)]
 * **Goal:** When the AI writes HTML, CSS, SVG, JavaScript, or React code, display it in a beautiful visual preview panel in the frontend.
 * **Cost:** $0 (Pure frontend implementation).
 * **How it works:**
@@ -76,6 +76,8 @@ This document maps out how you can upgrade your MERN AI assistant to perform key
      - For **HTML/CSS/JS**: Render inside a sandboxed `<iframe>` using the `srcDoc` attribute.
      - For **SVGs**: Render the raw SVG code inside a React component.
      - For **Mermaid Diagrams**: Use the `mermaid` package to draw flowcharts.
+* **Backend Implementation:**
+  Gemini is instructed via system prompts to format interactive code block responses in `<antartifact>` tags. The backend parses these tags (with standard code block fallback), stores them in the database Message model, and includes them in the socket `ai-response` event payload.
 
 ---
 
@@ -88,13 +90,15 @@ This document maps out how you can upgrade your MERN AI assistant to perform key
 
 ---
 
-## 6. Multi-Model Support (Free Model Switcher)
+## 6. Multi-Model Support (Free Model Switcher) - [COMPLETED (BACKEND)]
 * **Goal:** Allow users to switch between different LLMs (e.g., Llama 3, Gemma 2, Mixtral).
 * **Cost:** $0 (Using free developer endpoints).
 * **Free Providers:**
   1. **Groq Cloud API:** Extremely fast inference, completely free developer tier with generous limits (supporting Llama 3.1 8B/70B, Gemma 2 9B).
   2. **OpenRouter:** Offers a variety of free models labeled as `free` (e.g., Gemma 2 9B, Mistral 7B).
   3. **Hugging Face Serverless Inference API:** Access thousands of open-source models for free.
+* **Backend Implementation:**
+  The backend parses the model selection parameter (accepting `groq/` and `openrouter/` prefixes) from incoming socket payloads. It routes the prompt using standard HTTP `fetch` to Groq or OpenRouter, formats the response, applies the same artifact parser, persists the model name in database Message records, and emits the responding model in the socket payload.
 
 ---
 

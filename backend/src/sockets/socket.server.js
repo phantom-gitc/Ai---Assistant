@@ -47,6 +47,8 @@ async function initSocketServer(httpServer) {
         const attachment = messagePayload?.attachment || null;
         let chatId = messagePayload?.chat;
 
+        const model = messagePayload?.model || config.GEMINI_MODEL;
+
         if (!content) {
           return socket.emit("ai-error", "Content is required");
         }
@@ -98,6 +100,7 @@ async function initSocketServer(httpServer) {
           content,
           role: "user",
           attachments: attachmentMeta,
+          model,
         });
 
         await Chat.updateOne(
@@ -112,7 +115,7 @@ async function initSocketServer(httpServer) {
           .limit(15);
 
         const chatHistory = recentMessages.reverse();
-        const aiResponse = await aiService(chatHistory, { useSearch, useCodeExecution, attachment });
+        const aiResponse = await aiService(chatHistory, { useSearch, useCodeExecution, attachment, model });
 
         await Message.create({
           user: socket.user.id,
@@ -120,6 +123,8 @@ async function initSocketServer(httpServer) {
           content: aiResponse.text,
           role: "model",
           groundingMetadata: aiResponse.groundingMetadata,
+          artifacts: aiResponse.artifacts || [],
+          model,
         });
 
         socket.emit("ai-response", {
@@ -127,6 +132,8 @@ async function initSocketServer(httpServer) {
           groundingMetadata: aiResponse.groundingMetadata,
           chat: chatId,
           title: chat.title,
+          artifacts: aiResponse.artifacts || [],
+          model,
         });
       } catch (error) {
         console.error("AI service error:", error);

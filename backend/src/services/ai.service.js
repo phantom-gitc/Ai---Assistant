@@ -68,52 +68,183 @@ function buildContents(chatHistory, attachment, documentText) {
   return contents;
 }
 
-async function generateAIResponse(chatHistory, options = {}) {
-  if (!config.GEMINI_API_KEY) {
-    throw new Error("Gemini API key is missing. Add GEMINI_API_KEY to backend/.env and restart the server.");
+// Extract artifacts (HTML, SVG, React, Mermaid) from text
+export function extractArtifacts(text) {
+  if (!text) return [];
+  const artifacts = [];
+  const tagRegex = /<antartifact([\s\S]*?)>([\s\S]*?)<\/antartifact>/g;
+  let match;
+  while ((match = tagRegex.exec(text)) !== null) {
+    const attrString = match[1];
+    const content = match[2].trim();
+    const idMatch = attrString.match(/identifier=["']([^"']+)["']/);
+    const typeMatch = attrString.match(/type=["']([^"']+)["']/);
+    const titleMatch = attrString.match(/title=["']([^"']+)["']/);
+    artifacts.push({
+      id: idMatch ? idMatch[1] : `art-${Math.random().toString(36).substr(2, 9)}`,
+      type: typeMatch ? typeMatch[1] : 'text',
+      title: titleMatch ? titleMatch[1] : 'Artifact',
+      content
+    });
   }
+  // Fallback to markdown code blocks if no tag-based artifacts were found
+  if (artifacts.length === 0) {
+    const codeBlockRegex = /```(html|svg|mermaid|jsx|tsx|css|javascript|js)\n([\s\S]*?)```/g;
+    while ((match = codeBlockRegex.exec(text)) !== null) {
+      const type = match[1];
+      const content = match[2].trim();
+      let displayType = type;
+      if (type === 'jsx' || type === 'tsx' || type === 'javascript' || type === 'js') {
+        displayType = 'react';
+      }
+      artifacts.push({
+        id: `art-${Math.random().toString(36).substr(2, 9)}`,
+        type: displayType,
+        title: `Generated ${displayType.toUpperCase()}`,
+        content
+      });
+    }
+  }
+  return artifacts;
+}
+
+// Convert chat history to OpenAI message format
+function convertToOpenAIMessages(chatHistory, systemInstruction) {
+  const messages = [];
+  if (systemInstruction) {
+    messages.push({ role: "system", content: systemInstruction });
+  }
+  for (const item of chatHistory) {
+    const role = item.role === "assistant" || item.role === "model" ? "assistant" : "user";
+    messages.push({ role, content: item.content });
+  }
+  return messages;
+}
+
+// Call the Groq Chat Completions API
+async function callGroqAPI(chatHistory, model, systemInstruction) {
+  if (!config.GROQ_API_KEY) {
+    throw new Error("Groq API key is missing. Add GROQ_API_KEY to backend/.env and restart.");
+  }
+  const actualModel = model.replace(/^groq\//, "");
+  const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${config.GROQ_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: actualModel,
+      messages: convertToOpenAIMessages(chatHistory, systemInstruction),
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Groq API error: ${response.status} - ${errText}`);
+  }
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
+
+// Call the OpenRouter Chat Completions API
+async function callOpenRouterAPI(chatHistory, model, systemInstruction) {
+  if (!config.OPENROUTER_API_KEY) {
+    throw new Error("OpenRouter API key is missing. Add OPENROUTER_API_KEY to backend/.env.");
+  }
+  const actualModel = model.replace(/^openrouter\//, "");
+  const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${config.OPENROUTER_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: actualModel,
+      messages: convertToOpenAIMessages(chatHistory, systemInstruction),
+    }),
+  });
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenRouter API error: ${response.status} - ${errText}`);
+  }
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "";
+}
+
+async function generateAIResponse(chatHistory, options = {}) {
+  const model = options.model || config.GEMINI_MODEL;
+
+  const systemInstruction = `You are a helpful assistant.
+When writing self-contained code (HTML/CSS/JS, SVG, React components, or Mermaid diagrams), you MUST wrap the code inside a Claude-style artifact XML tag:
+<antartifact identifier="unique-id" type="html|svg|mermaid|react" title="Title of Artifact">
+... code content ...
+</antartifact>
+
+Rules for types:
+- Use 'html' for self-contained HTML/CSS/JS web applications.
+- Use 'svg' for raw SVG XML.
+- Use 'mermaid' for flowcharts or diagrams.
+- Use 'react' for React JSX components.`;
 
   try {
-    const apiConfig = {};
+    let text = "";
+    let groundingMetadata = null;
 
-    if (options.useSearch) {
-      apiConfig.tools = apiConfig.tools || [];
-      apiConfig.tools.push({ googleSearch: {} });
+    if (model.startsWith("groq/")) {
+      text = await callGroqAPI(chatHistory, model, systemInstruction);
+    } else if (model.startsWith("openrouter/")) {
+      text = await callOpenRouterAPI(chatHistory, model, systemInstruction);
+    } else {
+      // Fallback to Gemini
+      if (!config.GEMINI_API_KEY) {
+        throw new Error("Gemini API key is missing. Add GEMINI_API_KEY to backend/.env and restart the server.");
+      }
+
+      const apiConfig = {
+        systemInstruction,
+      };
+
+      if (options.useSearch) {
+        apiConfig.tools = apiConfig.tools || [];
+        apiConfig.tools.push({ googleSearch: {} });
+      }
+
+      if (options.useCodeExecution) {
+        apiConfig.tools = apiConfig.tools || [];
+        apiConfig.tools.push({ codeExecution: {} });
+      }
+
+      // Handle document text extraction if a non-image file is attached
+      let documentText = null;
+      const { attachment } = options;
+      if (attachment && !isImageMime(attachment.mimeType)) {
+        const fileBuffer = Buffer.from(attachment.data, "base64");
+        documentText = await extractDocumentText(fileBuffer, attachment.mimeType);
+      }
+
+      const contents = buildContents(chatHistory, attachment, documentText);
+
+      const response = await ai.models.generateContent({
+        model: model.startsWith("gemini/") ? model.replace(/^gemini\//, "") : model,
+        contents,
+        config: apiConfig,
+      });
+
+      groundingMetadata = response.candidates?.[0]?.groundingMetadata || null;
+      const parts = response.candidates?.[0]?.content?.parts || [];
+      text = formatResponseParts(parts) || response.text || "";
     }
 
-    if (options.useCodeExecution) {
-      apiConfig.tools = apiConfig.tools || [];
-      apiConfig.tools.push({ codeExecution: {} });
-    }
-
-    // Handle document text extraction if a non-image file is attached
-    let documentText = null;
-    const { attachment } = options;
-    if (attachment && !isImageMime(attachment.mimeType)) {
-      const fileBuffer = Buffer.from(attachment.data, "base64");
-      documentText = await extractDocumentText(fileBuffer, attachment.mimeType);
-    }
-
-    const contents = buildContents(chatHistory, attachment, documentText);
-
-    const response = await ai.models.generateContent({
-      model: config.GEMINI_MODEL,
-      contents,
-      config: apiConfig,
-    });
-
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata || null;
-    const parts = response.candidates?.[0]?.content?.parts || [];
-    const text = formatResponseParts(parts) || response.text || "";
+    const artifacts = extractArtifacts(text);
 
     return {
       text,
       groundingMetadata,
+      artifacts,
     };
   } catch (error) {
-    console.error("Gemini API error:", {
-      status: error?.status,
-      model: config.GEMINI_MODEL,
+    console.error("AI Generation API error:", {
+      model,
       message: error?.message,
     });
 

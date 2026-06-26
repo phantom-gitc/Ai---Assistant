@@ -11,8 +11,8 @@ const _config = {
     CLIENT_URL: process.env.CLIENT_URL || 'http://localhost:5173',
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,
     GEMINI_MODEL: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
-
-
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 }
 
 export default Object.freeze(_config);

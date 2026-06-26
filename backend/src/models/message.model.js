@@ -34,6 +34,20 @@ const messageSchema = new mongoose.Schema({
             fileName: { type: String },
         }],
         default: [],
+    },
+    // Stores parsed interactive code blocks
+    artifacts: {
+        type: [{
+            id: { type: String },
+            type: { type: String, enum: ["html", "svg", "mermaid", "react", "text"] },
+            title: { type: String },
+            content: { type: String },
+        }],
+        default: [],
+    },
+    // The LLM model name used for generation
+    model: {
+        type: String,
     }
 },{
     timestamps:true,
