@@ -23,10 +23,10 @@ async function testDocumentParser() {
   console.log(`2. PDFParse class loaded (pdf-parse v2): ${t2 ? "✅ PASS" : "❌ FAIL"}`);
   t2 ? passed++ : failed++;
 
-  // 3. PDFParse instance has .pdf() method
-  const instance = new PDFParse();
-  const t3 = typeof instance.pdf === "function";
-  console.log(`3. PDFParse instance has .pdf() method: ${t3 ? "✅ PASS" : "❌ FAIL"}`);
+  // 3. PDFParse instance has .getText() method
+  const instance = new PDFParse({});
+  const t3 = typeof instance.getText === "function";
+  console.log(`3. PDFParse instance has .getText() method: ${t3 ? "✅ PASS" : "❌ FAIL"}`);
   t3 ? passed++ : failed++;
 
   // 4. mammoth.extractRawText is callable

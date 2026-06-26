@@ -1,4 +1,4 @@
-import { extractArtifacts } from "./src/services/ai.service.js";
+import { extractArtifacts } from "../src/services/ai.service.js";
 
 // Test data with tag-based and markdown-based code blocks
 const testInput1 = `

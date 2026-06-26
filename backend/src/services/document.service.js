@@ -41,8 +41,9 @@ export async function extractDocumentText(fileBuffer, mimeType) {
   const mime = mimeType?.toLowerCase();
 
   if (mime === "application/pdf") {
-    const parser = new PDFParse();
-    const data = await parser.pdf(fileBuffer);
+    const parser = new PDFParse({ data: fileBuffer });
+    const data = await parser.getText();
+    await parser.destroy();
     return data.text?.trim() || "";
   }
 

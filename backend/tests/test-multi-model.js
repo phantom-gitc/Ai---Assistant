@@ -6,7 +6,7 @@ process.env.OPENROUTER_API_KEY = "mock-openrouter-key";
 process.env.GEMINI_API_KEY = "mock-gemini-key";
 
 // Dynamically import dependencies
-const { default: generateAIResponse } = await import("./src/services/ai.service.js");
+const { default: generateAIResponse } = await import("../src/services/ai.service.js");
 
 const originalFetch = globalThis.fetch;
 
